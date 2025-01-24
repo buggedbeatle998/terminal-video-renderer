@@ -4,11 +4,10 @@ from sys import stdout
 import download_vid
 from cursor import hide, show
 from fpstimer import FPSTimer
-import colorama
 
 
 class BMPvid_renderer:
-    def render_frames(self, folder: str, size_x: int, size_y: Optional[int] = None, ask: bool = False):
+    def render_frames(self, folder: str, size_x: int, size_y: Optional[int] = None, *, ask: bool = False):
         with open(f"{folder}frame0.bmp", "rb") as file:
             file.seek(18)
             width: int = int.from_bytes(file.read(4), "little")
@@ -18,7 +17,8 @@ class BMPvid_renderer:
             num_frames = len([name for name in listdir(folder) if path.isfile(name)])
 
         system(f"mode {size_x * 2}, {size_y}")
-        input("start?")
+        if ask:
+            input("start?")
         timer = FPSTimer(30)
         for i in range(0, 6572, 1):
             self.__parse_frame__(f"{folder}frame{i}.bmp", width, height, size_x, size_y)
@@ -47,7 +47,7 @@ def main() -> None:
     try:
         hide()
         renderer = BMPvid_renderer()
-        renderer.render_frames("frames/", 80, ask=True)
+        renderer.render_frames("frames/", 80)
     except KeyboardInterrupt:
         pass
     finally:
