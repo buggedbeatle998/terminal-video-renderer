@@ -1,8 +1,8 @@
 from typing import Optional
 import cv2
-from os import makedirs, path, listdir
+from os import makedirs, path
+from io import BufferedWriter
 from math import floor
-from io import BufferedWriter, TextIOWrapper
 
 
 def download_video(vid_path: str, folder: str, extension: str, params: Optional[tuple[int, int]] = None, *, log: bool = False) -> None:
@@ -47,6 +47,7 @@ def encode_video(vid_path: str, colour_depth: int = 8, monochrome: bool = False,
         
         file.write(size_x.to_bytes(length=4, byteorder="big"))
         file.write(size_y.to_bytes(length=4, byteorder="big"))
+        file.write(int(video.get(cv2.CAP_PROP_FPS)).to_bytes(length=2, byteorder="big"))
         framec: int = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
         buffer: int = framec
         buffer <<= 2
@@ -68,13 +69,13 @@ def encode_video(vid_path: str, colour_depth: int = 8, monochrome: bool = False,
                 #pxtable = [[0 for _ in size_x] for _ in size_y]
                 for i in range(height * width):
                     buffer <<= colour_depth
-                    buffer |= floor(frame[i // width][i % width][0] ** (colour_depth / 8))
+                    buffer |= floor(frame[i // width][i % width][0]) >> (8 - colour_depth)
                     bufflen += colour_depth
                     if not monochrome:
                         buffer <<= colour_depth
-                        buffer |= floor(frame[i // width][i % width][1] ** (colour_depth / 8))
+                        buffer |= floor(frame[i // width][i % width][1]) >> (8 - colour_depth)
                         buffer <<= colour_depth
-                        buffer |= floor(frame[i // width][i % width][2] ** (colour_depth / 8))
+                        buffer |= floor(frame[i // width][i % width][2]) >> (8 - colour_depth)
                         bufflen += 2 * colour_depth
                     if not bufflen % 8:
                         buff.write(buffer.to_bytes(length=(bufflen // 8), byteorder="big"))
@@ -93,4 +94,4 @@ def encode_video(vid_path: str, colour_depth: int = 8, monochrome: bool = False,
 
 
 if __name__ == "__main__":
-    encode_video("badapple.mp4", 1, True, log=True)
+    encode_video("OnceInALifetime.mp4", 1, True, log=True)

@@ -8,7 +8,7 @@ from io import BufferedReader
 
 
 class EVF_renderer:
-    def render_frames(self, path: str, size_x: int, size_y: Optional[int] = None, *, ask: bool = False):
+    def render_frames(self, path: str, size_x: int, size_y: Optional[int] = None, *, ask: bool = False) -> None:
         assert path[-4:] == ".evf", f"Wrong file type (should be .evf was .{path.split('.')[-1]})!"
         with open(path, "rb") as file:
             assert (magic_num := chr(int.from_bytes(file.read(1))) + chr(int.from_bytes(file.read(1)))) == "EV", f"Wrong magic number (should be EV was {magic_num})!"
@@ -19,6 +19,7 @@ class EVF_renderer:
                 size_y = height // (width // size_x)
             secxw: int = width // size_x
             secyh: int = height // size_y
+            frame_rate: int = int.from_bytes(file.read(2), "big")
             buffer: int = int.from_bytes(file.read(3), "big")
             colour_depth = buffer & ((1 << 4) - 1)
             buffer >>= 4
@@ -41,10 +42,11 @@ class EVF_renderer:
                 input("start?")
 
             with BufferedReader(file, ((width * height * colour_depth * (3 - 2 * monochrome) + 7) // 8) * num_frames) as buffile:
-                timer = FPSTimer(30)
+                timer = FPSTimer(frame_rate)
                 for i in range(0, num_frames, 1):
                     image: list[list[int]] = self.__parse_frame__(file, width, height, colour_depth, monochrome, size_x, size_y, num_bytes, step, pxl_size, secxw, secyh)
                     stdout.write('\r' + ''.join(["".join(["##" if square > 0 else "  " for square in row]) for row in image]))
+                    stdout.flush()
                     timer.sleep()
 
 
@@ -52,24 +54,26 @@ class EVF_renderer:
         secxw: int = width // size_x
         secyh: int = height // size_y
         file_tbl: list[list[int]] = [[0 for _ in range(size_x)] for _ in range(size_y)]
-        pxl: int = 0
+        pxl: int = -step * 8 // pxl_size
 
         cnum: int = 0
         for cnum in range(0, num_bytes, step):
+            pxl += 2 * step * 8 // pxl_size
             chunk: int = int.from_bytes(file.read(step), "big")
             for _ in range((step * 8) // pxl_size):
                 if monochrome:
+                    pxl -= 1
                     file_tbl[(pxl // width) // secyh][(pxl % width) // secxw] += (chunk & ((1 << colour_depth) - 1)) - ((1 << colour_depth) - 1) / 2
                     chunk >>= colour_depth
-                pxl += 1
         
         if num_bytes - (cnum + 1):
+            pxl += 2 * step * 8 // pxl_size
             chunk: int = int.from_bytes(file.read(num_bytes - cnum), "big")
-            for _ in range(width * height - pxl):
+            for _ in range(pxl - width * height):
                 if monochrome:
-                    file_tbl[(pxl // width) // secyh][(pxl % width) // secxw] += (chunk & ((1 << colour_depth) - 1)) - (1 << (colour_depth - 1))
+                    pxl -= 1
+                    file_tbl[(pxl // width) // secyh][(pxl % width) // secxw] += (chunk & ((1 << colour_depth) - 1)) - ((1 << colour_depth) - 1) / 2
                     chunk >>= colour_depth
-                pxl += 1
         
         return file_tbl
 
@@ -79,12 +83,13 @@ def main() -> None:
     try:
         hide()
         renderer = EVF_renderer()
-        renderer.render_frames("vidbuff.evf", 80, ask=True)
+        renderer.render_frames("OnceInALifetime.evf", 80, ask=True)
     except KeyboardInterrupt:
         pass
     finally:
         show()
         stdout.write("\x1b[39m\x1b[49m")
+        system("cls")
 
 
 if __name__ == "__main__":

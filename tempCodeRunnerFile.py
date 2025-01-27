@@ -1,0 +1,1 @@
+colour_depth / 8
