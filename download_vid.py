@@ -3,6 +3,8 @@ import cv2
 from os import makedirs, path
 from io import BufferedWriter
 from math import floor
+from time import time
+from sys import stdout
 
 
 def download_video(vid_path: str, folder: str, extension: str, params: Optional[tuple[int, int]] = None, *, log: bool = False) -> None:
@@ -56,42 +58,53 @@ def encode_video(vid_path: str, colour_depth: int = 8, monochrome: bool = False,
         buffer |= colour_depth
         file.write(buffer.to_bytes(length=3, byteorder="big"))
         file.flush()
+        times = [0 for _ in range(4)]
+        cd = 8 - colour_depth
         
         with BufferedWriter(file, ((size_x * size_y * colour_depth * (3 - 2 * monochrome) + 7) // 8) * framec) as buff:
-            for counter in range(framec):
+            for counter in range(100):
                 ret, frame = video.read()
                 if not ret:
                     break
-                    
 
+                temp = time()
                 buffer: int = 0
                 bufflen: int = 0
                 #pxtable = [[0 for _ in size_x] for _ in size_y]
-                for i in range(height * width):
-                    buffer <<= colour_depth
-                    buffer |= floor(frame[i // width][i % width][0]) >> (8 - colour_depth)
-                    bufflen += colour_depth
-                    if not monochrome:
+                temp1 = time()
+                for row in frame:
+                    for pxl in row:
                         buffer <<= colour_depth
-                        buffer |= floor(frame[i // width][i % width][1]) >> (8 - colour_depth)
-                        buffer <<= colour_depth
-                        buffer |= floor(frame[i // width][i % width][2]) >> (8 - colour_depth)
-                        bufflen += 2 * colour_depth
-                    if not bufflen % 8:
-                        buff.write(buffer.to_bytes(length=(bufflen // 8), byteorder="big"))
-                        buffer = 0
-                        bufflen = 0
+                        temp = time()
+                        buffer |= int(pxl[0]) >> cd
+                        times[1] += time() - temp
+                        bufflen += colour_depth
+                        if not monochrome:
+                            buffer <<= colour_depth
+                            buffer |= floor(pxl[1]) >> cd
+                            buffer <<= colour_depth
+                            buffer |= floor(pxl[2]) >> cd
+                            bufflen += 2 * colour_depth
+                        if not bufflen % 8:
+                            temp = time()
+                            buff.write(buffer.to_bytes(length=(bufflen // 8), byteorder="big"))
+                            buffer = 0
+                            bufflen = 0
+                            times[2] += time() - temp
+                times[3] += time() - temp1
                 
                 if bufflen:
                     buffer <<= bufflen % 8
                     buff.write(size_x.to_bytes(length=((bufflen + 7) // 8), byteorder="big"))
 
+                temp = time()
                 if log:
-                    print(f"Encoded Frame {counter} of {framec}")
-
+                    stdout.write(f"\rEncoded Frame {counter + 1} of {framec}")
+                times[0] += time() - temp
     if log:
-        print("Finished!")
+        stdout.write("\nFinished!\n")
+    print(times)
 
 
 if __name__ == "__main__":
-    encode_video("OnceInALifetime.mp4", 1, True, log=True)
+    encode_video("badapple.mp4", 1, True, log=True)

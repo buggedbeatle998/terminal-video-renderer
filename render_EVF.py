@@ -4,11 +4,12 @@ from sys import stdout
 import download_vid
 from cursor import hide, show
 from fpstimer import FPSTimer
+from time import time, sleep
 from io import BufferedReader
 
 
 class EVF_renderer:
-    def render_frames(self, path: str, size_x: int, size_y: Optional[int] = None, *, ask: bool = False) -> None:
+    def render_frames(self, path: str, size_x: int, size_y: Optional[int] = None, *,render_fps: Optional[int] = None, ask: bool = False) -> None:
         assert path[-4:] == ".evf", f"Wrong file type (should be .evf was .{path.split('.')[-1]})!"
         with open(path, "rb") as file:
             assert (magic_num := chr(int.from_bytes(file.read(1))) + chr(int.from_bytes(file.read(1)))) == "EV", f"Wrong magic number (should be EV was {magic_num})!"
@@ -36,17 +37,19 @@ class EVF_renderer:
                 step = (pxl_size * 4) // 8
             else:
                 step = pxl_size
+            
+            frame_step: int = frame_rate // render_fps
+            spf = 1 / render_fps
 
             system(f"mode {size_x * 2}, {size_y}")
             if ask:
                 input("start?")
 
             with BufferedReader(file, ((width * height * colour_depth * (3 - 2 * monochrome) + 7) // 8) * num_frames) as buffile:
-                timer = FPSTimer(frame_rate)
+                timer = FPSTimer(30)
                 for i in range(0, num_frames, 1):
                     image: list[list[int]] = self.__parse_frame__(file, width, height, colour_depth, monochrome, size_x, size_y, num_bytes, step, pxl_size, secxw, secyh)
                     stdout.write('\r' + ''.join(["".join(["##" if square > 0 else "  " for square in row]) for row in image]))
-                    stdout.flush()
                     timer.sleep()
 
 
@@ -80,16 +83,18 @@ class EVF_renderer:
 
 def main() -> None:
     system("cls")
+    debug = False
     try:
         hide()
         renderer = EVF_renderer()
-        renderer.render_frames("OnceInALifetime.evf", 80, ask=True)
+        renderer.render_frames("OnceInALifetime.evf", 80, render_fps=15, ask=True)
     except KeyboardInterrupt:
         pass
     finally:
         show()
         stdout.write("\x1b[39m\x1b[49m")
-        system("cls")
+        if not debug:
+            system("cls")
 
 
 if __name__ == "__main__":
