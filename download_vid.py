@@ -87,7 +87,7 @@ def encode_video(vid_path: str, colour_depth: int = 8, monochrome: bool = False,
         stdout.write("\nFinished!\n")
 
 
-if __name__ == "__main__":
+def main() -> None:
     # IMPORTANT INFO
     # * This currently does not support resizing.
 
@@ -99,3 +99,7 @@ if __name__ == "__main__":
     #   https://cobalt.tools/
 
     encode_video("OnceInALifeTime.mp4", 1, True, log=True)
+
+
+if __name__ == "__main__":
+    main()
